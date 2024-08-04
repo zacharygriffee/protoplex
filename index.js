@@ -1,4 +1,5 @@
-const { EventEmitter, on } = require('events')
+const { EventEmitter } = require('events')
+const on = require('events.on')
 const Protomux = require('protomux')
 const { Duplex } = require('streamx')
 const c = require('compact-encoding')
@@ -41,6 +42,7 @@ class ProtoplexStream extends Duplex {
       encoding,
       unique,
       userData,
+      protocol,
       ...stream
     } = opts
 
@@ -56,6 +58,7 @@ class ProtoplexStream extends Duplex {
     this.encoding = (encoding) ? c.raw.array(encoding) : this.encoding
     this.unique = unique ?? this.unique
     this.userData = userData ?? null
+    this.protocol = protocol || PROTOCOL
 
     this.channel = mux.createChannel({
       protocol: this.protocol,
@@ -182,7 +185,7 @@ module.exports = class Protoplex extends EventEmitter {
     return new Protoplex(mux, opts)
   }
 
-  get protocol () { return PROTOCOL }
+  get protocol () { return this._protocol }
 
   constructor (mux, opts = {}) {
     const {
@@ -192,6 +195,7 @@ module.exports = class Protoplex extends EventEmitter {
       onhandshake,
       encoding,
       unique,
+      protocol,
       ...streamOpts
     } = opts
 
@@ -205,6 +209,7 @@ module.exports = class Protoplex extends EventEmitter {
     this.encoding = encoding ?? this.encoding
     this.unique = unique ?? this.unique
     this.streamOpts = streamOpts ?? this.streamOpts
+    this._protocol = protocol || PROTOCOL
   }
 
   listen (id, opts = {}) {
