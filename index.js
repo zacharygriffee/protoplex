@@ -1,17 +1,18 @@
-const { EventEmitter } = require('events')
-const on = require('events.on')
-const Protomux = require('protomux')
-const { Duplex } = require('streamx')
-const c = require('compact-encoding')
-const b4a = require('b4a')
-const BufferMap = require('tiny-buffer-map')
-const FIFO = require('fast-fifo')
+import { EventEmitter } from 'events'
+import on from 'events.on'
+import Protomux from 'protomux'
+import { Duplex } from 'streamx'
+import c from 'compact-encoding'
+import b4a from 'b4a'
+import BufferMap from 'tiny-buffer-map'
+import FIFO from 'fast-fifo'
 
-const { version } = require('./package.json')
+const PROTOCOL = 'protoplex/zacharygriffee'
+globalThis.setImmediate ||= function setImmediate (cb) {
+  return setTimeout(cb)
+}
 
-const PROTOCOL = `protoplex/alpha@${version}`
-
-class ProtoplexStream extends Duplex {
+export class ProtoplexStream extends Duplex {
   mux = null
   channel = null
 
@@ -163,9 +164,18 @@ class ProtoplexStream extends Duplex {
   }
 }
 
-exports.ProtoplexStream = ProtoplexStream
+function toKey (id, protocol) {
+  return !!id ? b4a.concat([b4a.from(protocol + '###'), id]) : b4a.from(protocol + '###')
+}
 
-module.exports = class Protoplex extends EventEmitter {
+function fromKey (key) {
+  const parts = key.toString().split('###')
+  if (parts.length !== 2) throw new Error('Invalid key format')
+
+  return { protocol: parts[0], id: b4a.from(parts[1]) }
+}
+
+export default class Protoplex extends EventEmitter {
   mux = null
 
   id = null
@@ -174,6 +184,7 @@ module.exports = class Protoplex extends EventEmitter {
   encoding = null
   unique = null
   streamOpts = {}
+  protocol = PROTOCOL
 
   _streams = new Set()
   _listeners = new BufferMap()
@@ -186,7 +197,6 @@ module.exports = class Protoplex extends EventEmitter {
   }
 
   get protocol () { return this._protocol }
-
   constructor (mux, opts = {}) {
     const {
       id,
@@ -213,34 +223,40 @@ module.exports = class Protoplex extends EventEmitter {
   }
 
   listen (id, opts = {}) {
-    if (!b4a.isBuffer(id)) {
+    if (!!id && !b4a.isBuffer(id)) {
       opts = id
       id = null
     }
-    const { protocol, id: _id } = this
-    id = id ?? _id
-    if (this._listeners.has(id)) return this
-    this._listeners.set(id, opts)
-    this.mux.pair({ protocol, id }, this._onpair.bind(this))
+    const protocol = opts.protocol || this.protocol || PROTOCOL
+    id = id ?? this.id
+
+    const listenId = toKey(id, protocol)
+    if (this._listeners.has(listenId)) return this
+    this._listeners.set(listenId, opts)
+    this.mux.pair({ protocol, id }, this._onpair.bind(this, protocol))
+
     return this
   }
 
-  unlisten (id) {
-    const { protocol } = this
-    if (!this._listeners.has(id)) return this
-    this._listeners.delete(id)
-    this.mux.unpair({ protocol, id })
+  unlisten (opts = {}) {
+    const protocol = opts.protocol || this.protocol || PROTOCOL
+    const id = opts.id ?? this.id
+
+    const unlistenId = toKey(id, protocol)
+    if (!this._listeners.has(unlistenId)) return this
+    this._listeners.delete(unlistenId)
+    this.mux.unpair({ protocol, id: id })
     return this
   }
 
   connect (id, _opts = {}) {
-    if (!b4a.isBuffer(id)) {
+    if (!!id && !b4a.isBuffer(id)) {
       _opts = id
       id = null
     }
 
     const {
-      protocol,
+      protocol: _protocol,
       id: _id,
       handshake,
       handshakeEncoding,
@@ -251,6 +267,7 @@ module.exports = class Protoplex extends EventEmitter {
     } = this
 
     id = id ?? _id
+    const protocol = _opts.protocol || _protocol
 
     const opts = {
       protocol,
@@ -267,11 +284,8 @@ module.exports = class Protoplex extends EventEmitter {
     return new ProtoplexStream(this.mux, opts)
   }
 
-  _onpair (id) {
-    const _opts = this._listeners.get(id) ?? {}
-
+  _onpair (protocol, id) {
     const {
-      protocol,
       id: _id,
       handshake,
       handshakeEncoding,
@@ -282,6 +296,8 @@ module.exports = class Protoplex extends EventEmitter {
     } = this
 
     id = id ?? _id
+    const key = toKey(id, protocol);
+    const _opts = this._listeners.get(key) ?? {}
 
     const opts = {
       protocol,

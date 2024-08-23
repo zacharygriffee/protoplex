@@ -1,5 +1,5 @@
 import Protomux from 'protomux'
-import test from 'brittle'
+import { test, solo } from 'brittle'
 import c from 'compact-encoding'
 import b4a from 'b4a'
 import struct from 'compact-encoding-struct'
@@ -29,7 +29,9 @@ test('should connect on a given id', async (t) => {
 test('should connect on a given id and not another', async (t) => {
   t.plan(2)
   const { plexers: { server, client } } = testenv()
-  server.on('connection', (stream) => { t.ok(stream.id.toString() === 'address') })
+  server.on('connection', (stream) => {
+    t.ok(stream.id.toString() === 'address')
+  })
   server.listen(b4a.from('address'))
   client.connect(b4a.from('address'))
   const stream = client.connect(b4a.from('not listening'))
@@ -72,7 +74,7 @@ test('should send from "client" to "server"', async (t) => {
   })
   server.listen()
   const stream = client.connect()
-  stream.write(Buffer.from(message))
+  stream.write(b4a.from(message))
   stream.end()
 })
 
@@ -87,7 +89,7 @@ test('should send from "client" to "server" pre-connect', async (t) => {
   })
   server.listen()
   const stream = client.connect()
-  stream.write(Buffer.from(message))
+  stream.write(b4a.from(message))
   stream.end()
 })
 
@@ -97,7 +99,7 @@ test('should send from "server" to "client"', async (t) => {
   const message = 'Hello, World!'
 
   server.on('connection', (stream) => {
-    stream.write(Buffer.from(message))
+    stream.write(b4a.from(message))
     stream.end()
   })
 
@@ -127,7 +129,7 @@ test('it should send and recv messages from many clients', async (t) => {
 
   for (let i = 0; i < count; i++) {
     const stream = client.connect()
-    stream.write(Buffer.from(message))
+    stream.write(b4a.from(message))
     stream.end()
   }
 })
@@ -152,8 +154,8 @@ test('it should support bidirectional servers & clients', async (t) => {
     t.is(str, message)
   })
 
-  const id1 = Buffer.from('1')
-  const id2 = Buffer.from('2')
+  const id1 = b4a.from('1')
+  const id2 = b4a.from('2')
 
   server.listen(id1)
   client.listen(id2)
@@ -184,6 +186,39 @@ test('it should support passing custom encodings', async (t) => {
   stream.end()
 })
 
+test('it should support different custom protocols and IDs', async (t) => {
+  const protocols = ['custom-proto1', 'my-protocol2', 'test-protocol3', 'proto4', 'unique-protocol5']
+  const ids = [b4a.from('1'), b4a.from('2'), b4a.from('3'), b4a.from('4'), b4a.from('5')]
+
+  t.plan((protocols.length * ids.length) * 2)
+  const { plexers: { server, client } } = testenv()
+
+  const message = 'Hello, World!'
+
+  server.on('connection', async (stream) => {
+    let str = ''
+
+    const chunk = await new Promise(resolve => stream.on("data", resolve));
+    str += chunk.toString();
+
+    t.is(str, message)
+    stream.write(b4a.from(message));
+  })
+
+  for (const protocol of protocols) {
+    for (const id of ids) {
+      server.listen(id, {protocol})
+      const stream = client.connect(id, {protocol});
+
+      stream.write(b4a.from(message))
+
+      const chunk = await new Promise(resolve => stream.once("data", resolve));
+      t.is(message, chunk.toString())
+    }
+  }
+})
+
+
 test('big bidirectional write', async (t) => {
   t.plan(2)
   const { plexers: { server, client } } = testenv({ opts: { encoding: c.raw } })
@@ -201,11 +236,11 @@ test('big bidirectional write', async (t) => {
     t.is(str, message)
   })
 
-  server.listen(Buffer.from('server'))
-  client.listen(Buffer.from('client'))
+  server.listen(b4a.from('server'))
+  client.listen(b4a.from('client'))
 
   ;(async () => {
-    const stream = client.connect(Buffer.from('server'))
+    const stream = client.connect(b4a.from('server'))
     let i = 0
     for (const char of message.split('')) {
       stream.write(Buffer.from(char))
@@ -215,15 +250,17 @@ test('big bidirectional write', async (t) => {
   })()
 
   ;(async () => {
-    const stream = server.connect(Buffer.from('client'))
+    const stream = server.connect(b4a.from('client'))
     let i = 0
     for (const char of message.split('')) {
-      stream.write(Buffer.from(char))
+      stream.write(b4a.from(char))
       if (i++ % 10000 === 0) await new Promise((resolve) => setTimeout(resolve, 25 * Math.floor(Math.random() * 100)))
     }
     stream.end()
   })()
 })
+
+
 
 function random (max = Number.MAX_SAFE_INTEGER) {
   return Math.floor(Math.random() * max)

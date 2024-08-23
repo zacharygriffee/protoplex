@@ -1,10 +1,11 @@
 {
   "name": "@zacharygriffee/protoplex",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Multiplex multiple streams over a stream. Bidirectional clients / servers.",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "standard && brittle test.mjs"
+    "test": "brittle test.mjs"
   },
   "license": "Apache-2.0",
   "dependencies": {
@@ -20,7 +21,6 @@
     "brittle": "^3.4.0",
     "compact-encoding-struct": "^1.3.0",
     "duplex-through": "^1.0.2",
-    "framed-stream": "^1.0.1",
-    "standard": "^17.1.0"
+    "framed-stream": "^1.0.1"
   }
 }
