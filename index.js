@@ -196,6 +196,7 @@ export default class Protoplex extends EventEmitter {
     return new Protoplex(mux, opts)
   }
 
+  get isProtoplex() { return true; }
   get protocol () { return this._protocol }
   constructor (mux, opts = {}) {
     const {
