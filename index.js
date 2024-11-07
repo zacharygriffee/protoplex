@@ -1,5 +1,5 @@
-import { EventEmitter } from 'events'
-import on from 'events.on'
+import { EventEmitter } from 'eventemitter3'
+import { pEvent as on } from "p-event";
 import Protomux from 'protomux'
 import { Duplex } from 'streamx'
 import c from 'compact-encoding'
@@ -168,12 +168,12 @@ function toKey (id, protocol) {
   return !!id ? b4a.concat([b4a.from(protocol + '###'), id]) : b4a.from(protocol + '###')
 }
 
-function fromKey (key) {
-  const parts = key.toString().split('###')
-  if (parts.length !== 2) throw new Error('Invalid key format')
-
-  return { protocol: parts[0], id: b4a.from(parts[1]) }
-}
+// function fromKey (key) {
+//   const parts = key.toString().split('###')
+//   if (parts.length !== 2) throw new Error('Invalid key format')
+//
+//   return { protocol: parts[0], id: b4a.from(parts[1]) }
+// }
 
 export default class Protoplex extends EventEmitter {
   mux = null
