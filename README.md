@@ -4,6 +4,11 @@ Multiplexed streams over a protomux instance. Enables bi-directional clients and
 
 `npm install protoplex`
 
+# Changes from original library
+
+Primarily to remove node dependency. As well, custom protocol as protoplex can be used for many layers of communication that might need
+different underlying protocols.
+
 ## Usage
 ```js
 import SecretStream from '@hyperswarm/secret-stream'
