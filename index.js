@@ -1,5 +1,4 @@
 import { EventEmitter } from 'eventemitter3'
-import { pEvent as on } from "p-event";
 import Protomux from 'protomux'
 import { Duplex } from 'streamx'
 import c from 'compact-encoding'
@@ -319,6 +318,4 @@ export default class Protoplex extends EventEmitter {
   }
 
   [Symbol.iterator] () { return this._streams[Symbol.iterator]() }
-
-  [Symbol.asyncIterator] () { return on(this, 'connection') }
 }

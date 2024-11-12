@@ -13,7 +13,6 @@
     "compact-encoding": "^2.13.0",
     "eventemitter3": "^5.0.1",
     "fast-fifo": "^1.3.2",
-    "p-event": "^6.0.1",
     "protomux": "^3.10.0",
     "streamx": "^2.20.1",
     "tiny-buffer-map": "^1.1.1"
