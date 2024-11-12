@@ -78,9 +78,12 @@ export class ProtoplexStream extends Duplex {
         setImmediate(this.destroy.bind(this))
       },
       ondrain: this._callondrain.bind(this)
-    })
+    });
 
-    this.channel.open(this.handshake)
+    if (!this.channel) {
+      const errorMessage = `Failed to create channel: Channel with id "${this.id}" already exists. Use { unique: false } if this behavior is intended.`;
+      throw new Error(errorMessage);
+    }
   }
 
   _writev (data, cb) {

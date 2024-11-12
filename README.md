@@ -9,6 +9,8 @@ Multiplexed streams over a protomux instance. Enables bi-directional clients and
 Primarily to remove node dependency. As well, custom protocol as protoplex can be used for many layers of communication that might need
 different underlying protocols.
 
+If channel with same id and protocol is created and unique = false, error is thrown instead of trying to run open on null.
+
 ## Usage
 ```js
 import SecretStream from '@hyperswarm/secret-stream'
