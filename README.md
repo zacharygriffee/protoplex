@@ -13,6 +13,8 @@ This fork of Protoplex includes the following modifications:
 - **Error Handling for Duplicate Channels**: If a channel with the same ID and protocol is created and `unique = false`, an error is thrown instead of trying to open on `null`.
 - **Removal of Async Iterable for Connections**: The async iterable interface for connections has been removed. Instead, users should listen for incoming connections using the standard event-based approach: `plex.on("connection", (stream) => {})`, as shown in the usage example below.
 
+If channel with same id and protocol is created and unique = false, error is thrown instead of trying to run open on null.
+
 ## Usage
 ```js
 import SecretStream from '@hyperswarm/secret-stream'
