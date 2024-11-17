@@ -33,7 +33,7 @@ export class ProtoplexStream extends Duplex {
 
   opened = false
 
-  constructor (mux, opts = {}) {
+  constructor (plex, opts = {}) {
     const {
       id,
       handshake,
@@ -48,9 +48,9 @@ export class ProtoplexStream extends Duplex {
 
     super({ ...stream, eagerOpen: true })
 
-    if (!(mux?.isProtomux)) throw new Error('mux not an instance of Protomux!')
-
-    this.mux = mux
+    if (!(plex.mux?.isProtomux)) throw new Error('mux not an instance of Protomux!')
+    this.plex = plex;
+    this.mux = plex.mux
     this.id = id ?? this.id
     this.handshake = handshake ?? this.handshake
     this.handshakeEncoding = handshakeEncoding ?? this.handshakeEncoding
@@ -60,7 +60,7 @@ export class ProtoplexStream extends Duplex {
     this.userData = userData ?? null
     this.protocol = protocol || PROTOCOL
 
-    this.channel = mux.createChannel({
+    this.channel = plex.mux.createChannel({
       protocol: this.protocol,
       id: this.id,
       handshake: this.handshakeEncoding,
@@ -281,7 +281,7 @@ export default class Protoplex extends EventEmitter {
       id
     }
 
-    return new ProtoplexStream(this.mux, opts)
+    return new ProtoplexStream(this, opts)
   }
 
   _onpair (protocol, id) {
@@ -311,7 +311,7 @@ export default class Protoplex extends EventEmitter {
       id
     }
 
-    const stream = new ProtoplexStream(this.mux, opts)
+    const stream = new ProtoplexStream(this, opts)
     this._streams.add(stream)
     stream.once('close', () => this._streams.delete(stream))
     this.emit('connection', stream)
