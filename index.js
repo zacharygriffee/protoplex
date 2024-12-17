@@ -123,9 +123,12 @@ export class ProtoplexStream extends Duplex {
 
   _onmessage (batch) {
     let drain = true
-    for (const data of batch) {
-      if (drain) drain = this.push(data)
-      else this._q.push(data)
+    if (!batch.length) this.push(b4a.alloc(0));
+    else {
+      for (const data of batch) {
+        if (drain) drain = this.push(data)
+        else this._q.push(data)
+      }
     }
     if (drain) this.channel.cork()
   }

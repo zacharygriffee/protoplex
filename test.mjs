@@ -78,6 +78,20 @@ test('should send from "client" to "server"', async (t) => {
   stream.end()
 })
 
+test("should send empty messages", async t => {
+  t.plan(1);
+  const { plexers: { server, client } } = testenv()
+  const message = b4a.alloc(0);
+  server.on('connection', async (stream) => {
+    let b = await new Promise(resolve => stream.once("data", resolve));
+    t.ok(b4a.equals(b, b4a.alloc(0)));
+  })
+  server.listen()
+  const stream = client.connect()
+  stream.write(message)
+  stream.end()
+});
+
 test('should send from "client" to "server" pre-connect', async (t) => {
   t.plan(1)
   const { plexers: { server, client } } = testenv()
