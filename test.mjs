@@ -1,5 +1,5 @@
 import Protomux from 'protomux'
-import { test, solo } from 'brittle'
+import { test, solo, skip } from 'brittle'
 import c from 'compact-encoding'
 import b4a from 'b4a'
 import struct from 'compact-encoding-struct'
@@ -62,21 +62,29 @@ test('should propogate close from "client"', async (t) => {
 })
 
 test('should send from "client" to "server"', async (t) => {
-  t.plan(1)
-  const { plexers: { server, client } } = testenv()
-  const message = 'Hello, World!'
+  t.plan(1);
+
+  const { plexers: { server, client } } = testenv();
+  const message = 'Hello, World!';
+
   server.on('connection', async (stream) => {
-    let str = ''
+    let str = '';
     for await (const buf of stream) {
-      str += buf.toString()
+      str += buf.toString();
     }
-    t.is(str, message)
-  })
-  server.listen()
-  const stream = client.connect()
-  stream.write(b4a.from(message))
-  stream.end()
-})
+    t.is(str, message);
+  });
+
+  server.listen();
+
+  const stream = client.connect();
+  stream.write(b4a.from(message));
+  stream.end();
+
+  stream.on('close', () => {
+    console.log('[Test] Client stream closed');
+  });
+});
 
 test("should send empty messages", async t => {
   t.plan(1);
@@ -124,6 +132,30 @@ test('should send from "server" to "client"', async (t) => {
   for await (const buf of stream) str += buf.toString()
   t.is(str, message)
 })
+
+test('should send from "server" to "client" a very large message', async (t) => {
+  t.plan(1)
+  const { plexers: { server, client } } = testenv()
+  const message = b4a.from("x".repeat(1024 * 1024))
+
+  server.on('connection', (stream) => {
+    stream.write(message)
+    stream.end()
+  })
+
+  server.listen()
+  const stream = client.connect()
+
+  let buffers;
+  stream.once("data", data => {
+    buffers = data;
+  });
+
+  stream.once("close", () => {
+    t.ok(b4a.equals(message, buffers))
+  });
+})
+
 
 test('it should send and recv messages from many clients', async (t) => {
   const count = Math.floor(Math.random() * ((Math.floor(Math.random() * 10)) * 10)) || 1
@@ -232,7 +264,6 @@ test('it should support different custom protocols and IDs', async (t) => {
   }
 })
 
-
 test('big bidirectional write', async (t) => {
   t.plan(2)
   const { plexers: { server, client } } = testenv({ opts: { encoding: c.raw } })
@@ -276,6 +307,7 @@ test('big bidirectional write', async (t) => {
 
 
 
+
 function random (max = Number.MAX_SAFE_INTEGER) {
   return Math.floor(Math.random() * max)
 }
@@ -284,10 +316,13 @@ function randomChar () {
   return String.fromCharCode(random(4))
 }
 
-function randomStr (len) {
-  let str = ''
-  while (str.length < len) str += randomChar()
-  return str
+function randomStr (length) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(i % chars.length); // Cyclic character pattern
+  }
+  return result;
 }
 
 function testenv ({ opts = {} } = {}) {

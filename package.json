@@ -1,6 +1,6 @@
 {
   "name": "@zacharygriffee/protoplex",
-  "version": "2.2.6",
+  "version": "2.2.7",
   "description": "Multiplex multiple streams over a stream. Bidirectional clients / servers.",
   "main": "index.js",
   "type": "module",
@@ -12,15 +12,15 @@
     "b4a": "^1.6.6",
     "compact-encoding": "^2.13.0",
     "eventemitter3": "^5.0.1",
-    "fast-fifo": "^1.3.2",
     "protomux": "^3.10.0",
+    "rxjs": "^7.8.1",
     "streamx": "^2.20.1",
     "tiny-buffer-map": "^1.1.1"
   },
   "devDependencies": {
     "brittle": "^3.4.0",
     "compact-encoding-struct": "^1.3.0",
-    "duplex-through": "^1.0.2",
-    "framed-stream": "^1.0.1"
+    "framed-stream": "^1.0.1",
+    "duplex-through": "^1.0.2"
   }
 }
