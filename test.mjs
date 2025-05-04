@@ -305,6 +305,41 @@ test('big bidirectional write', async (t) => {
   })()
 })
 
+test('should handle handshake rejection gracefully', async (t) => {
+  t.plan(1);
+
+  const { plexers: { server, client } } = testenv();
+
+  // Server: reject all handshakes
+  server.listen({
+    handshakeEncoding: c.json,
+    onhandshake: (hs) => {
+      t.alike(hs, { test: 'fail' }); // ensure handshake data arrives
+      return false;
+    }
+  });
+
+  // Client: connect with test handshake
+  const stream = client.connect({
+    handshakeEncoding: c.json,
+    handshake: { test: 'fail' }
+  });
+
+  // Expect 'reject' event and 'close'
+  stream.on('reject', (err) => {
+    t.is(err.message, 'Connection Rejected!');
+  });
+
+  stream.on('error', (e) => {
+    if (e.message === 'Connection Rejected!') {
+      // Already handled by reject; don't fail test
+    } else {
+      t.fail(e);
+    }
+  });
+});
+
+
 
 
 

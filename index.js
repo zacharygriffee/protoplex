@@ -181,12 +181,19 @@ export class ProtoplexStream extends Duplex {
   async _onchannelopen(handshake) {
     try {
       const shouldConnect = await this._onhandshake(handshake);
-      if (!shouldConnect) return this._maybeOpen(new Error('Connection Rejected!'));
+      if (!shouldConnect) {
+        // SAFELY REJECT without throwing
+        const err = new Error('Connection Rejected!');
+        this.emit('reject', err); // ← emit a custom event
+        this.channel?.close();
+        this._maybeOpen(err);     // ← notify open handler with the error
+        return;
+      }
       this.remoteHandshake = handshake;
       this.emit('connect');
       this._maybeOpen(null);
     } catch (err) {
-      this._maybeOpen(err);
+      this._maybeOpen(err); // This one is still safe to pass along
     }
   }
 }
