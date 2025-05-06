@@ -4,7 +4,7 @@ import { Duplex } from 'streamx';
 import c from 'compact-encoding';
 import b4a from 'b4a';
 import BufferMap from 'tiny-buffer-map';
-import { Subject, ReplaySubject, firstValueFrom } from 'rxjs';
+import {Subject, ReplaySubject, firstValueFrom, defaultIfEmpty} from 'rxjs';
 import { concatMap } from 'rxjs/operators';
 
 const PROTOCOL = 'protoplex/zacharygriffee';
@@ -14,11 +14,13 @@ globalThis.setImmediate ||= function setImmediate(cb) {
 
 export class ProtoplexStream extends Duplex {
   constructor(plex, opts = {}) {
+    // pull out an `onreject` callback (defaults to a no-op)
     const {
       id,
       handshake,
       handshakeEncoding,
       onhandshake,
+      onreject = () => {},      // ← new
       encoding,
       unique,
       userData,
@@ -41,6 +43,7 @@ export class ProtoplexStream extends Duplex {
     this.encoding = encoding ? c.raw.array(encoding) : c.raw.array(c.raw);
     this.unique = unique ?? false;
     this.onhandshake = onhandshake ?? null;
+    this.onreject = onreject ?? null;
     this.remoteHandshake = null;
     this.userData = userData ?? null;
 
@@ -61,45 +64,39 @@ export class ProtoplexStream extends Duplex {
       handshake: this.handshakeEncoding,
       unique: this.unique,
       messages: [{ encoding: this.encoding, onmessage: this._onmessage.bind(this) }],
-      onopen: (handshake) => this._onchannelopen(handshake),
-      onclose: () => {
-        if (!this.opened) this._maybeOpen(null);
-        setImmediate(() => {
-          if (!this.destroyed) this.push(null);
-        });
-      },
-      ondestroy: () => {
-        if (!this.opened) this._maybeOpen(null);
-        setImmediate(this.destroy.bind(this));
-      },
+      onopen: handshake => this._onchannelopen(handshake),
+      onclose: () => setImmediate(() => this.push(null)),
+      ondestroy: () => setImmediate(() => this.destroy()),
       ondrain: () => this._onDrainEvent()
     });
 
     // Send outgoing data reactively
     this.outgoing$
-      .pipe(
-        concatMap(async (dataBatch) => {
-          const canSend = this.channel.messages[0].send(dataBatch);
-          if (!canSend) {
-            await firstValueFrom(this.drain$);
-          }
-          return true;
-        })
-      )
-      .subscribe({
-        error: (err) => {
-          if (!this.destroyed) this.destroy(err);
-        }
-      });
+        .pipe(
+            concatMap(dataBatch => {
+              if (!this.channel.messages[0].send(dataBatch)) {
+                return firstValueFrom(this.drain$.pipe(defaultIfEmpty(true)));
+              }
+              return Promise.resolve(true);
+            })
+        )
+        .subscribe({
+          error: err => this._handleError(err)
+        });
 
     this.channel.open(this.handshake);
   }
 
   _onDrainEvent() {
-    this.drain$.next();
+    this.drain$.next(true);
   }
 
   _writev(data, cb) {
+    if (this.destroyed) {
+      // Immediately reject writes if already being destroyed
+      cb(new Error("Stream destroyed"));
+      return;
+    }
     this.outgoing$.next(data);
     cb(null);
   }
@@ -114,7 +111,10 @@ export class ProtoplexStream extends Duplex {
           }
         },
         error: (err) => {
-          if (!this.destroyed) this.destroy(err);
+          // Handle error without termination
+          console.error("Incoming stream error:", err);
+          this.emit('error', err);
+          // Alternatively continue, depends on desired behavior
         },
         complete: () => {
           if (!this.destroyed) this.push(null);
@@ -130,8 +130,8 @@ export class ProtoplexStream extends Duplex {
   }
 
   _destroy(cb) {
-    this.mux = null;
-    this.channel = null;
+    // this only runs when *this* Duplex is destroyed:
+    this.channel.close();       // close the protocol channel
     this.incoming$.complete();
     this.outgoing$.complete();
     this.drain$.complete();
@@ -173,6 +173,13 @@ export class ProtoplexStream extends Duplex {
     }
   }
 
+  _handleError(err) {
+    // 1) politely close our channel
+    this.channel.close();
+    // 2) destroy *this* ProtoplexStream
+    this.destroy(err);
+  }
+
   _open(cb) {
     this._onopen = cb;
     if (this.channel.opened) this._maybeOpen(null);
@@ -182,20 +189,31 @@ export class ProtoplexStream extends Duplex {
     try {
       const shouldConnect = await this._onhandshake(handshake);
       if (!shouldConnect) {
-        // SAFELY REJECT without throwing
-        const err = new Error('Connection Rejected!');
-        this.emit('reject', err); // ← emit a custom event
-        this.channel?.close();
-        this._maybeOpen(err);     // ← notify open handler with the error
+        const err = new Error("Connection rejected by server");
+        // 1) notify the callback
+        this.onreject(err);
+        // 2) emit a user-land event
+        this.emit("reject", err);
+        // 3) silently drop the socket
+        this.channel.close();
+        this.destroy();
         return;
       }
+
+      // … everything you had here for the successful path …
       this.remoteHandshake = handshake;
       this.emit('connect');
       this._maybeOpen(null);
+
     } catch (err) {
-      this._maybeOpen(err); // This one is still safe to pass along
+      // if your onhandshake() threw, treat it exactly the same
+      this.onreject(err);
+      this.emit("reject", err);
+      this.channel.close();
+      this.destroy();
     }
   }
+
 }
 
 function toKey(id, protocol) {
