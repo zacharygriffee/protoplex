@@ -1,6 +1,6 @@
 {
   "name": "@zacharygriffee/protoplex",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "description": "Multiplex multiple streams over a stream. Bidirectional clients / servers.",
   "main": "index.js",
   "type": "module",
